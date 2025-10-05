@@ -1639,4 +1639,3 @@ Se precisar de ajuda:
 **Data**: Outubro 2025  
 **Compatível com**: pfSense CE 2.7.x  
 
-**Bons estudos e boa sorte na sua jornada como Analista de Infraestrutura!** 🚀
