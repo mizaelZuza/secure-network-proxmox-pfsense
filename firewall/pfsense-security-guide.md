@@ -6,10 +6,13 @@
 3. [Criação de Aliases](#aliases)
 4. [Regras de Firewall - LAN (Servidores)](#regras-lan)
 5. [Regras de Firewall - LAN_DESKTOPS (Clientes)](#regras-desktops)
-6. [Implementação de IDS/IPS com Suricata](#suricata)
-7. [Testes e Validação](#testes)
-8. [Monitoramento e Logs](#monitoramento)
-9. [Manutenção e Boas Práticas](#manutencao)
+6. [Regras de Firewall - WAN](#regras-wan)
+7. [Regras de Firewall - LAN_K8S (Kubernetes)](#regras-k8s)
+8. [Regras de NAT (Network Address Translation)](#regras-nat)
+9. [Configurações de VPN](#regras-vpn)
+10. [Testes e Validação](#testes)
+11. [Monitoramento e Logs](#monitoramento)
+12. [Manutenção e Boas Práticas](#manutencao)
 
 ---
 
@@ -24,14 +27,18 @@ Internet (Provedor)
 [pfSense Firewall]
     ├─→ 192.168.1.0/24 (vmbr1 - LAN Servidores)
     └─→ 192.168.2.0/24 (vmbr2 - LAN Clientes)
+    └─→ 192.168.3.0/24 (vmbr3 - LAN Kubernetes)
 ```
 
 ### Endereçamento IP:
-| Interface | Bridge | IP do pfSense | Rede | Gateway | Função |
-|-----------|--------|---------------|------|---------|--------|
-| WAN | vmbr0 | 192.168.0.100 | 192.168.0.0/24 | 192.168.0.1 | Internet |
-| LAN | vmbr1 | 192.168.1.1 | 192.168.1.0/24 | - | Servidores |
-| LAN_DESKTOPS | vmbr2 | 192.168.2.1 | 192.168.2.0/24 | - | Clientes |
+| Interface | Descrição | Bridge | IP do pfSense | Rede | IPv6 | Função |
+|-----------|-------------|--------|---------------|----------------|------|----------|
+| WAN | WAN | vmbr0 | 192.168.0.100 | 192.168.0.0/24 | - | Internet |
+| LAN | LAN | vmbr1 | 192.168.1.1 | 192.168.1.0/24 | Track | Servidores |
+| OPT1 | LAN_DESKTOPS| vmbr2 | 192.168.2.1 | 192.168.2.0/24 | - | Clientes |
+| OPT2 | LAN_K8S | vmbr3 | 192.168.3.1 | 192.168.3.0/24 | - | Kubernetes |
+
+> **Nota Importante:** Para que o restante do guia funcione corretamente, renomeie as interfaces no pfSense. Navegue até **Interfaces → Assignments**, clique na interface **OPT1** e mude seu nome para `LAN_DESKTOPS`. Repita o processo para **OPT2**, renomeando-a para `LAN_K8S`.
 
 ---
 
@@ -67,7 +74,7 @@ Aliases facilitam a gestão e manutenção das regras.
 1. Clique em **Add** (botão com ↑)
 2. Preencha:
    ```
-   Name: Rede_Servidores
+   Name: LAN_SERVIDORES_NET
    Description: Rede dos servidores (vmbr1)
    Type: Network(s)
    ```
@@ -82,14 +89,26 @@ Aliases facilitam a gestão e manutenção das regras.
 1. **Add** novamente
 2. Preencha:
    ```
-   Name: Rede_Clientes
+   Name: LAN_DESKTOPS_NET
    Description: Rede dos clientes/desktops (vmbr2)
    Type: Network(s)
    Network: 192.168.2.0/24
    ```
 3. **Save**
 
-### Passo 4: Criar Alias - Portas Web
+### Passo 4: Criar Alias - Rede Kubernetes
+
+1. **Add** novamente
+2. Preencha:
+   ```
+   Name: LAN_K8S_NET
+   Description: Rede do Kubernetes (vmbr3)
+   Type: Network(s)
+   Network: 192.168.3.0/24
+   ```
+3. **Save**
+
+### Passo 5: Criar Alias - Portas Web
 
 1. Clique na aba **Ports**
 2. **Add**
@@ -106,7 +125,7 @@ Aliases facilitam a gestão e manutenção das regras.
    ```
 5. **Save**
 
-### Passo 5: Criar Alias - Portas de Administração
+### Passo 6: Criar Alias - Portas de Administração
 
 1. Na aba **Ports**, clique em **Add**
 2. Preencha:
@@ -122,7 +141,7 @@ Aliases facilitam a gestão e manutenção das regras.
    ```
 4. **Save**
 
-### Passo 6: Criar Alias - Serviços Permitidos
+### Passo 7: Criar Alias - Serviços Permitidos
 
 1. **Add** em Ports
 2. Preencha:
@@ -140,15 +159,57 @@ Aliases facilitam a gestão e manutenção das regras.
    ```
 4. **Save**
 
-### Passo 7: Aplicar Mudanças
+
+
+### Passo 8: Criar Alias - API Kubernetes
+
+1. Na aba **Ports**, clique em **Add**
+2. Preencha:
+   ```
+   Name: API_K8S
+   Description: Porta da API do Kubernetes
+   Type: Port(s)
+   Port: 6443
+   ```
+3. **Save**
+
+### Passo 9: Criar Alias - IP do TrueNAS
+
+1. Na aba **IP**, clique em **Add**
+2. Preencha:
+   ```
+   Name: IP_TrueNas
+   Description: IP do servidor TrueNAS
+   Type: Host(s)
+   IP or FQDN: 192.168.1.114
+   ```
+3. **Save**
+
+### Passo 10: Criar Alias - IP do PC Admin
+
+1. Na aba **IP**, clique em **Add**
+2. Preencha:
+   ```
+   Name: IP_Admin_PC
+   Description: IP do PC de administração na WAN
+   Type: Host(s)
+   IP or FQDN: 192.168.0.10
+   ```
+3. **Save**
+
+### Passo 11: Aplicar Mudanças
 - Clique em **Apply Changes** no topo da página
 
 ### ✅ Aliases Criados:
-- ✅ Rede_Servidores (192.168.1.0/24)
-- ✅ Rede_Clientes (192.168.2.0/24)
+- ✅ LAN_SERVIDORES_NET (192.168.1.0/24)
+- ✅ LAN_DESKTOPS_NET (192.168.2.0/24)
+- ✅ LAN_K8S_NET (192.168.3.0/24)
+- ✅ IP_TrueNas (192.168.1.114)
+- ✅ IP_Admin_PC (192.168.0.10)
 - ✅ Portas_Web (80, 443)
 - ✅ Portas_Admin (22, 3389)
 - ✅ Portas_Servicos_LAN (80, 443, 22, 3389)
+- ✅ API_K8S (6443)
 
 ---
 
@@ -260,19 +321,12 @@ Protocol: TCP
 Source: LAN net
 Destination: Any
 Destination Port Range:
-  From: HTTP (80)
-  To: HTTPS (443)
+  From: (other) Custom: Portas_Web
+  To: (other) Custom: Portas_Web
 
 Description: LAN → Internet: Navegação web
 ```
 3. **Save**
-
-**Alternativa usando Alias:**
-```
-Destination Port Range:
-  From: (other) Custom: Portas_Web
-  To: (other) Custom: Portas_Web
-```
 
 ---
 
@@ -338,7 +392,28 @@ Description: LAN → LAN: SSH e RDP entre servidores
 
 ---
 
-### Regra 8: BLOQUEAR acesso à rede de clientes
+### Regra 8: Permitir acesso à API do Kubernetes
+
+1. **Add** ↑
+2. Preencha:
+```
+Action: Pass
+Interface: LAN
+Protocol: TCP
+
+Source: LAN_SERVIDORES_NET
+Destination: Single host or alias: LAN_K8S_NET
+Destination Port Range:
+  From: (other) Custom: API_K8S
+  To: (other) Custom: API_K8S
+
+Description: LAN → K8S: Acesso à API do Kubernetes
+```
+3. **Save**
+
+---
+
+### Regra 9: BLOQUEAR acesso à rede de clientes
 
 1. **Add** ↑
 2. Preencha:
@@ -348,7 +423,7 @@ Interface: LAN
 Protocol: Any
 
 Source: LAN net
-Destination: Single host or alias: Rede_Clientes
+Destination: Single host or alias: LAN_DESKTOPS_NET
 
 Log: ✅ (marque "Log packets that are handled by this rule")
 
@@ -358,7 +433,7 @@ Description: LAN → Desktops: BLOQUEAR (segmentação)
 
 ---
 
-### Regra 9: BLOQUEAR e LOGAR todo o resto (Opcional)
+### Regra 10: BLOQUEAR e LOGAR todo o resto (Opcional)
 
 1. **Add** ↓ (adicionar no final)
 2. Preencha:
@@ -391,12 +466,13 @@ Description: LAN → Any: BLOQUEAR resto (default deny)
 2. ✅ Pass  | TCP/UDP| *   | LAN net | LAN addr | 53          | LAN → pfSense: DNS
 3. ✅ Pass  | TCP    | *   | LAN net | LAN addr | 443         | LAN → pfSense: WebGUI
 4. ✅ Pass  | TCP/UDP| *   | LAN net | Any      | 53          | LAN → Internet: DNS
-5. ✅ Pass  | TCP    | *   | LAN net | Any      | 80,443      | LAN → Internet: Web
+5. ✅ Pass  | TCP    | *   | LAN net | Any      | Portas_Web  | LAN → Internet: Web
 6. ✅ Pass  | UDP    | *   | LAN net | Any      | 123         | LAN → Internet: NTP
 7. ✅ Pass  | ICMP   | *   | LAN net | Any      | *           | LAN → Any: ICMP
-8. ✅ Pass  | TCP    | *   | LAN net | LAN net  | 22,3389     | LAN → LAN: SSH/RDP
-9. ❌ Block | Any    | *   | LAN net | Rede_Cli | *           | LAN → Desktops: BLOCK
-10.❌ Block | Any    | *   | LAN net | Any      | *           | LAN → Any: Default Deny
+8. ✅ Pass  | TCP    | *   | LAN net | LAN net  | Portas_Admin| LAN → LAN: SSH/RDP
+9. ✅ Pass  | TCP    | *   | LAN_SERVIDORES_NET | LAN_K8S_NET | API_K8S    | LAN → K8S: API Access
+10.❌ Block | Any    | *   | LAN net | LAN_DESKTOPS_NET | *           | LAN → Desktops: BLOCK
+11.❌ Block | Any    | *   | LAN net | Any      | *           | LAN → Any: Default Deny
 ```
 
 ---
@@ -484,8 +560,8 @@ Protocol: TCP
 Source: LAN_DESKTOPS net
 Destination: Any
 Destination Port Range:
-  From: HTTP (80)
-  To: HTTPS (443)
+  From: (other) Custom: Portas_Web
+  To: (other) Custom: Portas_Web
 
 Description: Desktops → Internet: Navegação web
 ```
@@ -503,7 +579,7 @@ Interface: LAN_DESKTOPS
 Protocol: TCP
 
 Source: LAN_DESKTOPS net
-Destination: Single host or alias: Rede_Servidores
+Destination: Single host or alias: LAN_SERVIDORES_NET
 Destination Port Range:
   From: (other) Custom: Portas_Servicos_LAN
   To: (other) Custom: Portas_Servicos_LAN
@@ -582,379 +658,243 @@ Description: Desktops → Any: BLOQUEAR resto (default deny)
 ### ✅ Ordem Final das Regras LAN_DESKTOPS:
 
 ```
-1. ✅ Pass  | TCP/UDP| *   | Desktops | pfSense  | 53          | Desktops → pfSense: DNS
-2. ✅ Pass  | TCP    | *   | Desktops | pfSense  | 443         | Desktops → pfSense: WebGUI
-3. ✅ Pass  | TCP/UDP| *   | Desktops | Any      | 53          | Desktops → Internet: DNS
-4. ✅ Pass  | TCP    | *   | Desktops | Any      | 80,443      | Desktops → Internet: Web
-5. ✅ Pass  | TCP    | *   | Desktops | Servs    | 80,443,22.. | Desktops → Servidores
-6. ✅ Pass  | ICMP   | *   | Desktops | Any      | *           | Desktops → Any: ICMP
-7. ✅ Pass  | UDP    | *   | Desktops | Any      | 123         | Desktops → Internet: NTP
-8. ❌ Block | Any    | *   | Desktops | Any      | *           | Desktops → Any: Default
+1. ✅ Pass  | TCP/UDP| *   | LAN_DESKTOPS_NET | LAN_DESKTOPS addr | 53          | Desktops → pfSense: DNS
+2. ✅ Pass  | TCP    | *   | LAN_DESKTOPS_NET | LAN_DESKTOPS addr | 443         | Desktops → pfSense: WebGUI
+3. ✅ Pass  | TCP/UDP| *   | LAN_DESKTOPS_NET | Any      | 53          | Desktops → Internet: DNS
+4. ✅ Pass  | TCP    | *   | LAN_DESKTOPS_NET | Any      | Portas_Web  | Desktops → Internet: Web
+5. ✅ Pass  | TCP    | *   | LAN_DESKTOPS_NET | LAN_SERVIDORES_NET | Portas_Servicos_LAN | Desktops → Servidores
+6. ✅ Pass  | ICMP   | *   | LAN_DESKTOPS_NET | Any      | *           | Desktops → Any: ICMP
+7. ✅ Pass  | UDP    | *   | LAN_DESKTOPS_NET | Any      | 123         | Desktops → Internet: NTP
+8. ❌ Block | Any    | *   | LAN_DESKTOPS_NET | Any      | *           | Desktops → Any: Default
 ```
 
 ---
 
-## 🔍 Implementação de IDS/IPS com Suricata {#suricata}
+## Regras de Firewall - WAN {#regras-wan}
 
-### O que é Suricata?
+Regras aplicadas à interface de entrada da internet.
 
-**Suricata** é um sistema de **detecção e prevenção de intrusão** (IDS/IPS) open-source que:
-- Analisa o tráfego em tempo real
-- Detecta ataques e malware
-- Pode bloquear automaticamente ameaças (modo IPS)
-- Usa assinaturas (rules) constantemente atualizadas
-
-### IDS vs IPS:
-- **IDS (Intrusion Detection System)**: Apenas **alerta** sobre ameaças
-- **IPS (Intrusion Prevention System)**: **Bloqueia** ameaças automaticamente
-
----
-
-### Parte 1: Instalação do Suricata
-
-#### Passo 1: Acessar o Package Manager
-
-1. Login no pfSense
-2. Navegue: **System → Package Manager**
-3. Clique na aba **Available Packages**
-
-#### Passo 2: Instalar Suricata
-
-1. Use o campo de busca: digite `suricata`
-2. Localize o pacote **suricata**
-3. Clique em **Install**
-4. Confirme clicando em **Confirm**
-5. Aguarde a instalação (pode levar alguns minutos)
-6. Quando terminar, aparecerá: "Package suricata installed successfully"
-
----
-
-### Parte 2: Configuração Inicial do Suricata
-
-#### Passo 1: Acessar Suricata
-
-1. Navegue: **Services → Suricata**
-2. Clique na aba **Global Settings**
-
-#### Passo 2: Configurações Globais
+### ✅ Ordem Final das Regras WAN:
 
 ```
-Enable Suricata: ✅ (marque)
-Enable Live Rule Swap on Update: ✅
-Remove Blocked Hosts Interval: 1 hour
-Keep Suricata Settings After Deinstall: ✅
-Hide Deprecated Rules Categories: ✅
-```
-
-**Save** (no final da página)
-
----
-
-### Parte 3: Baixar Regras (Rules)
-
-#### Passo 1: Acessar Updates
-
-1. Navegue: **Services → Suricata**
-2. Clique na aba **Updates**
-
-#### Passo 2: Selecionar fontes de regras
-
-**Opções gratuitas recomendadas:**
-
-```
-ETOpen Emerging Threats rules: ✅
-  - Regras gratuitas, atualizadas regularmente
-  - Cobertura ampla de ameaças
-
-Snort GPLv2 Community rules: ✅
-  - Regras da comunidade Snort
-  - Complementa as ETOpen
-
-Abuse.ch SSL Blacklist: ✅
-  - Lista de certificados SSL maliciosos
-
-Abuse.ch Feodo Tracker: ✅
-  - Lista de servidores C&C de botnets
-```
-
-**⚠️ Nota sobre Snort e ET Pro:**
-- Requerem registro (gratuito ou pago)
-- Para laboratório, as opções acima são suficientes
-
-#### Passo 3: Atualizar regras
-
-1. Role até o final da página
-2. Clique em **Update** (botão com ícone de download)
-3. Aguarde o download (pode levar vários minutos na primeira vez)
-4. Status mudará para "Success" quando concluir
-
----
-
-### Parte 4: Configurar Interface WAN
-
-#### Passo 1: Adicionar Interface
-
-1. Navegue: **Services → Suricata**
-2. Aba **Interfaces**
-3. Clique em **Add**
-
-#### Passo 2: Configurar Interface WAN
-
-**Enable:**
-```
-Enable: ✅
-Interface: WAN
-Description: Suricata on WAN
-```
-
-**Alert Settings:**
-```
-Block Offenders: ✅ (modo IPS - bloqueia ameaças)
-Kill States: ✅ (remove conexões ativas de IPs bloqueados)
-IPS Mode: Legacy Mode
-```
-
-**Choose the networks Suricata should inspect:**
-```
-WAN and Local Networks
-```
-
-**Scroll para baixo e clique em Save**
-
----
-
-### Parte 5: Configurar Categorias de Regras
-
-#### Passo 1: Acessar WAN Categories
-
-1. Em **Services → Suricata → Interfaces**
-2. Clique no ícone de **categorias** (ícone de lista) na linha da WAN
-
-#### Passo 2: Selecionar categorias (Recomendação para laboratório)
-
-**Emerging Threats (ET) - Categorias recomendadas:**
-
-```
-Categoria                          | Ativar | Descrição
------------------------------------|--------|---------------------------
-✅ emerging-attack_response         | Sim    | Respostas a ataques
-✅ emerging-malware                 | Sim    | Malware conhecido
-✅ emerging-exploit                 | Sim    | Exploits de vulnerabilidades
-✅ emerging-scan                    | Sim    | Varreduras de porta
-✅ emerging-dos                     | Sim    | Ataques DoS/DDoS
-✅ emerging-phishing                | Sim    | Tentativas de phishing
-✅ emerging-botcc                   | Sim    | Command & Control de botnets
-✅ emerging-trojan                  | Sim    | Trojans
-✅ emerging-worm                    | Sim    | Worms
-❌ emerging-policy                  | Não    | Gera muitos falsos positivos
-❌ emerging-info                    | Não    | Informativo apenas
-```
-
-**⚠️ Cuidado:**
-- Não ative TODAS as categorias
-- Muitas regras = alto uso de CPU e falsos positivos
-- Comece conservador e vá ajustando
-
-#### Passo 3: Aplicar seleção
-
-1. Role até o final
-2. **Save** (botão no final)
-
----
-
-### Parte 6: Configurar Interface LAN (Opcional)
-
-Para monitorar tráfego interno suspeito:
-
-1. **Services → Suricata → Interfaces**
-2. **Add**
-3. Configure:
-```
-Enable: ✅
-Interface: LAN
-Description: Suricata on LAN
-Block Offenders: ✅
-IPS Mode: Legacy Mode
-Networks: LAN and Local Networks
-```
-4. **Save**
-5. Configure categorias similares à WAN (mas pode ser mais restritivo)
-
----
-
-### Parte 7: Iniciar o Suricata
-
-#### Passo 1: Iniciar nas interfaces
-
-1. **Services → Suricata → Interfaces**
-2. Clique no **ícone de play** (▶️) na coluna da WAN
-3. Status mudará para "Running" (ícone verde)
-4. Repita para LAN se configurou
-
-#### Passo 2: Verificar se está funcionando
-
-1. **Services → Suricata → Interfaces**
-2. Verifique:
-   - Status: **Running** (bolinha verde)
-   - Coluna "Alerts": começará a incrementar conforme detectar ameaças
-
----
-
-### Parte 8: Monitorar Alertas
-
-#### Visualizar Alertas:
-
-1. **Services → Suricata → Alerts**
-2. Selecione a interface (WAN ou LAN) no dropdown
-3. Clique em **View**
-
-**Colunas importantes:**
-- **Timestamp**: Quando ocorreu
-- **SID**: ID da regra que disparou
-- **Severity**: Gravidade (1=crítico, 2=alto, 3=médio)
-- **Source/Dest**: IPs origem e destino
-- **Message**: Descrição da ameaça
-
-#### Bloquear IPs manualmente:
-
-- Clique no ícone **+** ao lado de um alerta
-- O IP será bloqueado automaticamente
-
----
-
-### Parte 9: Ajustes Finos e Supressões
-
-#### Falsos Positivos:
-
-Se uma regra estiver gerando muitos alertas falsos:
-
-1. **Services → Suricata → Suppress**
-2. Clique na interface (WAN ou LAN)
-3. **Add**
-4. Configure:
-```
-Type: Suppress
-SID: [número da regra]
-Track By: Source ou Destination
-IP Address: [IP específico ou rede]
-Description: [motivo da supressão]
-```
-5. **Save**
-
----
-
-### Parte 10: Configurações Avançadas (Opcional)
-
-#### Ajustar Performance:
-
-1. **Services → Suricata → Interface WAN (editar)**
-2. Aba **Detection Performance Settings**
-
-**Para ambiente de laboratório/baixo tráfego:**
-```
-Search Optimize: Low
-IDS Profile: Community
-```
-
-**Para ambientes com mais tráfego:**
-```
-Search Optimize: Medium
-IDS Profile: Balanced
+1. ✅ Pass  | TCP    | *   | IP_Admin_PC | LAN_K8S_NET | 22           | WAN → K8S: SSH do Admin
+2. ✅ Pass  | TCP    | *   | IP_Admin_PC | LAN_SERVIDORES_NET | Portas_Web | WAN → Servidores: HTTP/HTTPS do Admin
+3. ✅ Pass  | ICMP   | *   | WAN net     | WAN address | *            | WAN → WAN: ICMP
+4. ✅ Pass  | TCP    | *   | WAN net     | WAN address | 443          | WAN → WAN: WebGUI
+5. ✅ Pass  | TCP    | *   | Any         | 192.168.3.10| 8443         | WAN → K8S Host: K8S Dashboard (NAT)
+6. ✅ Pass  | UDP    | *   | Any         | WAN address | 1194         | WAN → WAN: OpenVPN
 ```
 
 ---
 
-### Manutenção do Suricata
+## ☸️ Regras de Firewall - LAN_K8S (Kubernetes) {#regras-k8s}
 
-#### Atualizar Regras Regularmente:
-
-**Manual:**
-1. **Services → Suricata → Updates**
-2. **Update** (recomendado semanalmente)
-
-**Automático:**
-1. **Services → Suricata → Global Settings**
-2. Configure:
-```
-Update Interval: 12 hours (ou 1 day)
-Update Start Time: 00:00
-```
-
-#### Limpar Logs Antigos:
-
-1. **Services → Suricata → Logs View**
-2. Selecione a interface
-3. Clique em **Clear** para limpar logs antigos
+### Preparação:
+1. Navegue: **Firewall → Rules → LAN_K8S**
+2. Exclua todas as regras permissivas (se houver)
 
 ---
 
-### Testes do Suricata
+### Regra 1: Permitir acesso ao pfSense (DNS)
 
-#### Teste 1: EICAR Test File (Malware de teste)
-
-De uma VM, baixe o arquivo de teste EICAR:
-
-```bash
-curl http://www.eicar.org/download/eicar.com.txt
+1. **Add** ↑
+2. Preencha:
 ```
+Action: Pass
+Interface: LAN_K8S
+Protocol: TCP/UDP
 
-**Esperado:** Suricata deve detectar e alertar (ou bloquear se IPS ativo)
+Source: LAN_K8S net
+Destination: LAN_K8S address
+Destination Port Range:
+  From: DNS (53)
+  To: DNS (53)
 
-#### Teste 2: Scan de Portas
-
-De fora da rede (ou de uma VM), faça um scan:
-
-```bash
-nmap -sS 192.168.0.100
+Description: K8S → pfSense: DNS
 ```
-
-**Esperado:** Suricata deve detectar o scan e alertar
-
-#### Teste 3: Verificar Logs
-
-1. **Services → Suricata → Alerts**
-2. Deve aparecer alertas dos testes acima
+3. **Save**
 
 ---
 
-### Resolução de Problemas
+### Regra 2: Permitir comunicação interna no Cluster
 
-#### Suricata não inicia:
+1. **Add** ↑
+2. Preencha:
+```
+Action: Pass
+Interface: LAN_K8S
+Protocol: Any
 
-**Causa comum:** Memória insuficiente
+Source: LAN_K8S net
+Destination: LAN_K8S net
 
-**Solução:**
-1. Aumente RAM da VM pfSense para pelo menos 2GB
-2. Desabilite categorias de regras menos importantes
-3. **Services → Suricata → Interface (editar) → Detection Performance**: escolha "Low"
-
-#### Alto uso de CPU:
-
-**Soluções:**
-1. Reduza número de categorias ativas
-2. Ajuste "Detection Performance" para "Low"
-3. Considere usar apenas modo IDS (não IPS) nas LANs
-
-#### Muitos falsos positivos:
-
-**Soluções:**
-1. Revise as categorias ativas
-2. Desative categorias "policy" e "info"
-3. Use suppressions para regras específicas
-4. Ajuste "IDS Profile" para "Balanced"
+Description: K8S → K8S: Comunicação interna
+```
+3. **Save**
 
 ---
 
-### Recursos Adicionais sobre Suricata
+### Regra 3: Permitir acesso ao TrueNAS
 
-**Documentação Oficial:**
-- https://docs.netgate.com/pfsense/en/latest/packages/suricata/
+1. **Add** ↑
+2. Preencha:
+```
+Action: Pass
+Interface: LAN_K8S
+Protocol: TCP/UDP
 
-**Emerging Threats Rules:**
-- https://rules.emergingthreats.net/
+Source: LAN_K8S net
+Destination: Single host or alias: IP_TrueNas
+Destination Port Range:
+  From: (other) Custom: Portas_Web
+  To: (other) Custom: Portas_Web
 
-**Suricata Documentation:**
-- https://suricata.readthedocs.io/
+Description: K8S → TrueNAS
+```
+3. **Save**
+
+---
+
+### Regra 4: Permitir retorno de conexão SSH para Admin
+
+1. **Add** ↑
+2. Preencha:
+```
+Action: Pass
+Interface: LAN_K8S
+Protocol: TCP
+
+Source: LAN_K8S net
+Destination: Single host or alias: IP_Admin_PC
+Destination Port Range:
+  From: SSH (22)
+  To: SSH (22)
+
+Description: K8S → Admin PC: Retorno SSH
+```
+3. **Save**
+
+---
+
+### Regra 5: Permitir acesso à Internet
+
+1. **Add** ↑ (para Web)
+2. Preencha:
+```
+Action: Pass
+Interface: LAN_K8S
+Protocol: TCP
+
+Source: LAN_K8S net
+Destination: Any
+Destination Port Range:
+  From: (other) Custom: Portas_Web
+  To: (other) Custom: Portas_Web
+
+Description: K8S → Internet: Navegação Web
+```
+3. **Save**
+
+4. **Add** ↑ (para NTP)
+5. Preencha:
+```
+Action: Pass
+Interface: LAN_K8S
+Protocol: UDP
+
+Source: LAN_K8S net
+Destination: Any
+Destination Port Range:
+  From: NTP (123)
+  To: NTP (123)
+
+Description: K8S → Internet: Sincronização NTP
+```
+6. **Save**
+
+7. **Add** ↑ (para ICMP)
+8. Preencha:
+```
+Action: Pass
+Interface: LAN_K8S
+Protocol: ICMP
+
+Source: LAN_K8S net
+Destination: Any
+
+Description: K8S → Any: ICMP para diagnóstico
+```
+9. **Save**
+
+---
+
+### Regra 6: BLOQUEAR e LOGAR todo o resto
+
+1. **Add** ↓ (final)
+2. Preencha:
+```
+Action: Block
+Interface: LAN_K8S
+Protocol: Any
+
+Source: LAN_K8S net
+Destination: Any
+
+Log: ✅
+
+Description: K8S → Any: BLOQUEAR resto (default deny)
+```
+3. **Save**
+
+---
+
+### Aplicar as mudanças:
+- **Apply Changes**
+
+---
+
+### ✅ Ordem Final das Regras LAN_K8S:
+
+```
+1. ✅ Pass  | TCP/UDP| LAN_K8S net | LAN_K8S addr | 53             | K8S → pfSense: DNS
+2. ✅ Pass  | Any    | LAN_K8S net | LAN_K8S net  | *              | K8S → K8S: Comunicação interna
+3. ✅ Pass  | TCP/UDP| LAN_K8S net | IP_TrueNas   | Portas_TrueNas | K8S → TrueNAS
+4. ✅ Pass  | TCP    | LAN_K8S net | IP_Admin_PC  | 22             | K8S → Admin PC: Retorno SSH
+5. ✅ Pass  | TCP    | LAN_K8S net | Any          | Portas_Web     | K8S → Internet: Web
+6. ✅ Pass  | UDP    | LAN_K8S net | Any          | 123            | K8S → Internet: NTP
+7. ✅ Pass  | ICMP   | LAN_K8S net | Any          | *              | K8S → Any: ICMP
+8. ❌ Block | Any    | LAN_K8S net | Any          | *              | K8S → Any: Default Deny
+```
+
+---
+
+## 🔄 Regras de NAT (Network Address Translation) {#regras-nat}
+
+### NAT de Saída (Outbound)
+
+O firewall está configurado no modo **Advanced Outbound NAT**, permitindo controle manual sobre como o tráfego das redes internas é traduzido para o IP da WAN.
+
+| Rede de Origem | Interface de Saída | Descrição |
+|:---------------|:-------------------|:------------|
+| `192.168.3.0/24` | WAN | NAT LAN_K8S para WAN |
+| `192.168.1.0/24` | WAN | NAT LAN_SERVIDORES para WAN |
+| `192.168.2.0/24` | WAN | Regras automáticas para ISAKMP/VPN |
+
+### NAT de Entrada (Port Forward)
+
+Regras que redirecionam portas da WAN para serviços internos.
+
+| Interface | Porta Externa | IP Interno | Porta Interna | Descrição |
+|:----------|:--------------|:-----------|:--------------|:------------|
+| WAN | 8443 | 192.168.3.10 | 8443 | NAT → VIP - K8S Dashboard |
+
+---
+
+## 🌐 Configurações de VPN {#regras-vpn}
+
+- **OpenVPN**: Uma regra na interface `WAN` permite a conexão de clientes OpenVPN na porta `1194/UDP`.
+- **IPsec**: Regras de NAT geradas automaticamente para o protocolo `ISAKMP` (porta 500). Configuração de um túnel IPsec.
+**Em implantação**
 
 ---
 
@@ -1524,8 +1464,8 @@ Desabilite: UPnP, NAT-PMP se não usar
 - [ ] Endereçamento IP correto
 
 ### Aliases:
-- [ ] Rede_Servidores criado
-- [ ] Rede_Clientes criado
+- [ ] LAN_SERVIDORES_NET criado
+- [ ] LAN_DESKTOPS_NET criado
 - [ ] Portas_Web criado
 - [ ] Portas_Admin criado
 - [ ] Portas_Servicos_LAN criado
@@ -1550,13 +1490,14 @@ Desabilite: UPnP, NAT-PMP se não usar
 - [ ] NTP para internet
 - [ ] Default deny no final
 
-### Suricata (IDS/IPS):
-- [ ] Suricata instalado
-- [ ] Regras baixadas (ETOpen, Snort Community, etc.)
-- [ ] Interface WAN configurada
-- [ ] Categorias selecionadas
-- [ ] Modo IPS ativado
-- [ ] Suricata rodando
+### Regras de Firewall - LAN_K8S:
+- [ ] Acesso ao pfSense (DNS)
+- [ ] Comunicação interna no Cluster
+- [ ] Acesso ao TrueNAS
+- [ ] Retorno de conexão SSH para Admin
+- [ ] Acesso à Internet (Web, NTP, ICMP)
+- [ ] Default deny no final
+
 
 ### Testes:
 - [ ] VM na LAN acessa internet
@@ -1583,15 +1524,10 @@ Desabilite: UPnP, NAT-PMP se não usar
 
 ## 🎯 Conclusão
 
-Parabéns! Você implementou:
 
 ✅ **Firewall pfSense com segmentação de rede**
 - Servidores isolados de clientes
 - Regras baseadas no princípio do menor privilégio
-
-✅ **IDS/IPS com Suricata**
-- Detecção de ameaças em tempo real
-- Bloqueio automático de ataques
 
 ✅ **Política de segurança robusta**
 - Apenas tráfego necessário permitido
@@ -1635,7 +1571,8 @@ Se precisar de ajuda:
 
 ---
 
-**Versão do Guia**: 1.0  
+**Versão do Guia**: 1.1
 **Data**: Outubro 2025  
 **Compatível com**: pfSense CE 2.7.x  
 
+| 🏁 Sumário | [WIKI_SUMARIO.md](WIKI_SUMARIO.md) |

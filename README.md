@@ -1,61 +1,71 @@
-# Projeto: Implementação de Firewall pfSense Seguro com IDS/IPS no Proxmox
+# Laboratório de Infraestrutura Completa com Proxmox, pfSense, TrueNAS e Kubernetes
 
-## 🎯 Objetivo
+Este repositório serve como um guia detalhado para a construção de uma infraestrutura de laboratório robusta e segura, simulando um ambiente de produção moderno. O projeto utiliza tecnologias open-source de ponta para virtualização, segurança de rede, armazenamento e orquestração de contêineres.
 
-Este projeto tem como objetivo implementar uma infraestrutura de rede segura utilizando o firewall pfSense virtualizado no Proxmox. A configuração visa proteger uma rede local segmentada em duas sub-redes (servidores e clientes) através de políticas de segurança bem definidas e um sistema de detecção e prevenção de intrusão (IDS/IPS) com Suricata.
+## 🎯 Objetivo do Projeto
 
-## 🛡️ Arquitetura da Rede
+O objetivo principal é documentar o processo de ponta a ponta para configurar um ambiente totalmente funcional, segmentado e seguro, utilizando:
+- **Proxmox VE** como a plataforma de virtualização (hypervisor).
+- **pfSense** como firewall, roteador e sistema de prevenção de intrusão (IDS/IPS).
+- **TrueNAS SCALE** como servidor de armazenamento de rede (NAS), fornecendo storage persistente.
+- **Kubernetes (K8s)** para orquestrar aplicações em contêineres de forma resiliente.
 
-A topologia da rede implementada é a seguinte:
+## 🏛️ Arquitetura da Infraestrutura
 
-```
-Internet (Provedor)
-    ↓
-192.168.0.0/24 (vmbr0 - WAN)
-    ↓
-[pfSense Firewall]
-    ├─→ 192.168.1.0/24 (vmbr1 - LAN Servidores)
-    └─→ 192.168.2.0/24 (vmbr2 - LAN Clientes)
-```
+A arquitetura é projetada para ser modular e segmentada, onde cada componente tem uma função específica e se comunica de forma segura através de redes virtuais isoladas.
 
-### Endereçamento IP
+| Camada | Componente | Rede / Bridge | Sub-rede | Função / Conexão |
+| :--- | :--- | :--- | :--- | :--- |
+| **Externa** | Internet | - | - | Conexão com o provedor de internet. |
+| **Host Físico** | Proxmox VE | `vmbr0` (WAN) | - | Hypervisor que hospeda todas as VMs e faz a ponte com a rede externa. |
+| **Firewall** | VM: **pfSense** | `vmbr0` (WAN) | DHCP | Recebe o link da internet. |
+| | | `vmbr1` (LAN Servidores) | `192.168.1.1/24` | Gateway para a rede de serviços (Storage). |
+| | | `vmbr2` (LAN Clientes) | `192.168.2.1/24` | Gateway para a rede de usuários finais. |
+| | | `vmbr3` (LAN Kubernetes) | `192.168.3.1/24` | Gateway para o cluster de contêineres. |
+| **Serviços** | VM: **TrueNAS SCALE** | `vmbr1` | `192.168.1.0/24` | Fornece armazenamento via NFS para o Kubernetes. |
+| | VM: **Cluster Kubernetes** | `vmbr3` | `192.168.3.0/24` | Executa as aplicações em contêineres. |
 
-| Interface    | Bridge | IP do pfSense | Rede             | Gateway        | Função     |
-| :----------- | :----- | :------------- | :--------------- | :------------- | :--------- |
-| WAN          | vmbr0  | 192.168.0.100  | 192.168.0.0/24   | 192.168.0.1  | Internet   |
-| LAN          | vmbr1  | 192.168.1.1    | 192.168.1.0/24   | -              | Servidores |
-| LAN_DESKTOPS | vmbr2  | 192.168.2.1    | 192.168.2.0/24   | -              | Clientes   |
+- **Proxmox VE**: É a camada base que hospeda todas as Máquinas Virtuais (VMs).
+- **pfSense**: Atua como o "portão" da rede. Ele gerencia todo o tráfego entre a internet e as redes internas (Servidores, Clientes, Kubernetes), aplicando regras de firewall e monitorando ameaças com o Suricata.
+- **TrueNAS SCALE**: Fornece armazenamento centralizado e resiliente (via RAIDZ) para o cluster Kubernetes através do protocolo NFS.
+- **Kubernetes**: O cluster, isolado em sua própria rede, utiliza o armazenamento do TrueNAS para dados persistentes de suas aplicações.
 
-## 🔒 Políticas de Segurança
+## 🚀 Tecnologias Aplicadas
 
-Os seguintes princípios de segurança são aplicados:
+| Categoria | Tecnologia | Função |
+| :--- | :--- | :--- |
+| **Virtualização** | **Proxmox VE** | Hypervisor para criação e gerenciamento de VMs. |
+| **Firewall & Rede** | **pfSense** | Roteamento, Firewall, DHCP e segmentação de rede. |
+| **Segurança** | **Suricata** | Sistema de Detecção e Prevenção de Intrusão (IDS/IPS). |
+| **Armazenamento** | **TrueNAS SCALE** | Storage de rede (NAS) com ZFS para resiliência. |
+| **Protocolo de Storage**| **NFS** | Compartilhamento de arquivos em rede para o Kubernetes. |
+| **Orquestração** | **Kubernetes (K8s)** | Gerenciamento de contêineres em alta disponibilidade. |
+| **Sistema Operacional**| **Ubuntu Server** | SO base para os nós do Kubernetes. |
 
--   **Menor Privilégio**: Liberar apenas o acesso necessário para cada componente da rede.
--   **Segmentação**: Isolar servidores de clientes para limitar o impacto de possíveis ataques.
--   **Defesa em Profundidade**: Implementar múltiplas camadas de segurança para aumentar a proteção.
--   **Log e Auditoria**: Registrar tentativas de acesso e eventos relevantes para análise e auditoria.
+## 📂 Estrutura do Repositório
 
-### Matriz de Acesso
+Este projeto é organizado em diretórios, cada um focando em uma parte específica da infraestrutura:
 
-| Origem → Destino       | Internet                      | pfSense                 | Servidores (LAN)          | Clientes (Desktops)   |
-| :--------------------- | :---------------------------- | :---------------------- | :------------------------ | :-------------------- |
-| **Servidores**         | HTTP/HTTPS, DNS, NTP, ICMP   | DNS, WebGUI             | SSH, RDP                  | ❌ Bloqueado          |
-| **Clientes**           | HTTP/HTTPS, DNS, ICMP         | DNS, WebGUI             | HTTP/HTTPS, SSH, RDP      | Entre si OK           |
-| **Internet**           | -                             | Apenas admin (192.168.0.0/24) | ❌ Bloqueado            | ❌ Bloqueado          |
+- **/proxmox**: Contém guias para a configuração inicial do Proxmox, incluindo a criação das redes virtuais (bridges) e o provisionamento de todas as VMs necessárias.
+- **/firewall**: Documentação detalhada sobre a instalação e configuração do pfSense, criação de regras de firewall, aliases e a implementação do IDS/IPS com Suricata.
+- **/storage**: Guias para instalar o TrueNAS SCALE em uma VM, configurar pools de armazenamento (RAIDZ) e expor o storage via NFS para o Kubernetes.
+- **/k8s**: Detalhes sobre a montagem do cluster Kubernetes, incluindo a configuração dos nós (Control Plane, Workers) e a integração com o storage persistente.
 
-## 🔥 Firewall pfSense e IDS/IPS Suricata
+## 🏁 Como Começar
 
-O pfSense é configurado com regras de firewall para controlar o tráfego entre as redes e a Internet, seguindo a matriz de acesso definida. Adicionalmente, o Suricata é implementado como um sistema de detecção e prevenção de intrusão (IDS/IPS) para monitorar o tráfego em tempo real, detectar ameaças e, opcionalmente, bloquear automaticamente o tráfego malicioso.
+Para construir a infraestrutura do zero, siga a ordem recomendada dos guias:
 
-### Aliases
+1.  **1º - Proxmox**: Comece configurando o hypervisor e as redes base.
+2.  **2º - Firewall**: Implemente o pfSense para estabelecer as fundações de rede e segurança.
+3.  **3º - Storage**: Configure o TrueNAS para preparar o armazenamento persistente.
+4.  **4º - Kubernetes**: Com a infraestrutura de base pronta, construa o cluster Kubernetes.
 
-Aliases são utilizados para facilitar a gestão e manutenção das regras do firewall. Os seguintes aliases são criados:
+## ✨ Principais Funcionalidades Implementadas
 
--   Rede\_Servidores (192.168.1.0/24)
--   Rede\_Clientes (192.168.2.0/24)
--   Portas\_Web (80, 443)
--   Portas\_Admin (22, 3389)
--   Portas\_Servicos\_LAN (80, 443, 22, 3389)
+- **Segmentação de Rede**: Isolação completa entre as redes de servidores, clientes e do cluster Kubernetes, aumentando a segurança.
+- **Defesa em Profundidade**: Múltiplas camadas de segurança com firewall (pfSense) e detecção de intrusão (Suricata).
+- **Armazenamento Resiliente**: Uso de ZFS e RAIDZ no TrueNAS para proteger os dados contra falha de disco.
+- **Storage Persistente para Contêineres**: Permite que aplicações no Kubernetes salvem dados que persistem além do ciclo de vida de um pod.
+- **Infraestrutura como Código (Documentação)**: O repositório serve como uma documentação detalhada que permite recriar o ambiente de forma consistente.
 
-
-Este README fornece uma visão geral do projeto e suas configurações de segurança. Para detalhes específicos de configuração, consulte a documentação detalhada do pfSense e Suricata.
+> **Aviso**: Este projeto foi criado para fins de estudo e aprendizado. Para ambientes de produção, recomenda-se aprofundar as configurações de segurança, realizar testes de carga e considerar hardware dedicado.
